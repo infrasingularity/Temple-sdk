@@ -1,0 +1,39 @@
+{
+  "name": "temple-loop-trading-server",
+  "version": "1.0.0",
+  "description": "HTTP server exposing Loop + Temple Canton trading (holdings, orders, merge) for Temple to call via API",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "validate": "node scripts/validate.mjs",
+    "test:routes": "node scripts/test-routes.mjs",
+    "test:temple-api": "node scripts/temple-api-test.mjs",
+    "fetch:trades": "node scripts/fetch-recent-trades.mjs",
+    "fetch:exchange-history": "node scripts/fetch-exchange-historical-trades.mjs",
+    "mm:example": "node scripts/mm-poll-example.mjs",
+    "mm": "node dist/mm-runner.js",
+    "mm:dev": "tsx watch src/mm-runner.ts",
+    "watch:temple-trades": "node scripts/log-temple-ws-trades.mjs"
+  },
+  "dependencies": {
+    "@fivenorth/loop-sdk": "file:../loop-sdk",
+    "@temple-digital-group/temple-canton-js": "1.0.39",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "node-forge": "^1.3.1",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

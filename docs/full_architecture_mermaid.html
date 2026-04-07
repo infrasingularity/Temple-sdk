@@ -1,0 +1,81 @@
+
+<div id="mm" style="padding:8px 0"></div>
+<script type="module">
+import mermaid from 'https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs';
+const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+await document.fonts.ready;
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'base',
+  fontFamily: '"Anthropic Sans", sans-serif',
+  themeVariables: {
+    darkMode: dark,
+    fontSize: '13px',
+    primaryColor: dark ? '#1D9E75' : '#E1F5EE',
+    primaryTextColor: dark ? '#9FE1CB' : '#085041',
+    primaryBorderColor: dark ? '#0F6E56' : '#0F6E56',
+    lineColor: dark ? '#9c9a92' : '#73726c',
+    secondaryColor: dark ? '#185FA5' : '#E6F1FB',
+    tertiaryColor: dark ? '#534AB7' : '#EEEDFE',
+    textColor: dark ? '#c2c0b6' : '#3d3d3a',
+    edgeLabelBackground: dark ? '#2C2C2A' : '#F1EFE8',
+    clusterBkg: dark ? '#2C2C2A' : '#F1EFE8',
+    clusterBorder: dark ? '#444441' : '#B4B2A9',
+  },
+  flowchart: { curve: 'basis', padding: 20 }
+});
+
+const diagram = `flowchart TD
+    subgraph EXT["External data sources"]
+        BIN["Binance WebSocket<br/>BTC/USDT live price"]
+        TWS["Temple WebSocket<br/>wss://ws-dev.temple.../stream"]
+        TREST["Temple REST API<br/>api-testnet.templedigitalgroup.com"]
+    end
+
+    subgraph FEEDS["Price feeds — binance-feed.ts + temple-ws-client.ts"]
+        BIN -->|"best_bid / best_ask / mid<br/>sub-100ms"| REF["reference-price.ts<br/>EXTERNAL mode"]
+        TWS -->|"subscribe orderbook:CBTC/USDCx"| OBK["Temple book depth<br/>bids, asks"]
+        TWS -->|"subscribe trades:CBTC/USDCx"| FILL["Fill notifications<br/>instant on execution"]
+    end
+
+    subgraph SIGNALS["Signal layer — perp-signals.ts (optional)"]
+        BIN -->|"OI + funding + L/S ratio<br/>every 30s"| SIG["Perp signal<br/>bullish / bearish / neutral"]
+    end
+
+    subgraph SAFETY["Safety layer — safety.ts"]
+        REF --> BASIS["Basis check<br/>Temple vs Binance"]
+        OBK --> BASIS
+        BASIS -->|"diverge > 100bps"| HALT["HALT — cancel all"]
+        BASIS -->|"diverge 50-100bps"| WIDE["Widen spreads"]
+        VOL["Volatility gate<br/>BTC move > 100bps/10s"] --> HALT
+        LAT["Latency monitor<br/>WS roundtrip > 500ms"] --> HALT
+    end
+
+    subgraph ENGINE["Core engine — market-maker.ts"]
+        REF -->|"fair price anchor"| QE["Quote engine<br/>build bid/ask ladder"]
+        SIG -->|"offset 0 or 1"| QE
+        BASIS -->|"spread multiplier"| QE
+        INV["Inventory tracker<br/>CBTC position"] -->|"skew bids/asks"| QE
+        FILL -->|"immediate requote"| QE
+    end
+
+    subgraph RISK["Risk manager — risk-manager.ts"]
+        QE --> RM["Circuit breakers<br/>daily loss / rate limit"]
+        INV -->|"> 90% max"| SUPP["Suppress one side"]
+    end
+
+    subgraph ACTIONS["Temple REST — actions only"]
+        RM -->|"place order"| CREATE["POST /v1/orders/create"]
+        RM -->|"cancel order"| CANCEL["POST /v1/orders/cancel"]
+        RM -->|"emergency wipe"| CANCELALL["POST /v1/orders/cancel-all"]
+        STARTUP["Startup reconcile"] --> ACTIVE["GET /v1/orders/active"]
+        STARTUP --> BAL["GET /v1/account/balances"]
+    end
+
+    FILL -->|"update position"| INV
+    CREATE -->|"orderId → track"| INV
+`;
+
+const { svg } = await mermaid.render('mm-svg', diagram);
+document.getElementById('mm').innerHTML = svg;
+</script>

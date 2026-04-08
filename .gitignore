@@ -3,3 +3,5 @@
 !.env.example
 dist/
 node_modules/
+scripts/
+src/mm

@@ -2,11 +2,11 @@
  * Pure quoting math for MM — no I/O.
  * Fair `mid` comes from Binance (referencePrice).
  *
- * Ladder (2 levels per side today — arch §8 shows 3; extend here later):
- * - L1 bid price: mid * (1 - bidBps/10000),  bidBps = halfSpreadBps + inventoryTiltBps
- * - L2 bid price: mid * (1 - (bidBps + levelGapBps)/10000)
- * So MM_LEVEL_GAP_BPS is **extra bps from mid** for level 2 vs level 1 on that side (not “total ladder width”).
- * Example: halfSpread 20, levelGap 30 → L1 bid 20 bps below mid, L2 bid 50 bps below mid (~30 bps between rungs).
+ * Ladder (3 levels per side):
+ * - Level n uses total bps from mid = sideHalfBps + (n - 1) × levelGapBps,
+ *   where sideHalfBps is bidBps or askBps (halfSpreadBps ± inventory tilt).
+ * - Bid n: mid * (1 - bps/10000); Ask n: mid * (1 + bps/10000).
+ * Example: halfSpread 20, levelGap 30 → bid L1/L2/L3 at 20/50/80 bps below mid.
  *
  * Inventory tilt: tiltBps = invRatio * invSkewMaxBps * inventorySkewFactor (capped by invSkewMaxBps at |invRatio|≤1, factor≤1).
  * Arch INVENTORY_SKEW_FACTOR=0.7 is MM_INVENTORY_SKEW_FACTOR; MM_INV_SKEW_MAX_BPS is the bps ceiling at full inv when factor=1.
@@ -17,7 +17,7 @@ export type DesiredOrder = {
   side: 'Buy' | 'Sell';
   price: number;
   quantity: number;
-  level: 1 | 2;
+  level: 1 | 2 | 3;
 };
 
 function bpsToFrac(bps: number): number {
@@ -44,18 +44,27 @@ export function computeDesiredOrders(
   const bidBps = Math.max(1, baseHalf + tiltBps);
   const askBps = Math.max(1, baseHalf - tiltBps);
 
-  const bid1 = mid * (1 - bpsToFrac(bidBps));
-  const bid2 = mid * (1 - bpsToFrac(bidBps + cfg.levelGapBps));
-  const ask1 = mid * (1 + bpsToFrac(askBps));
-  const ask2 = mid * (1 + bpsToFrac(askBps + cfg.levelGapBps));
-
   const q = cfg.orderSize;
-  return [
-    { side: 'Buy', price: bid1, quantity: q, level: 1 },
-    { side: 'Buy', price: bid2, quantity: q, level: 2 },
-    { side: 'Sell', price: ask1, quantity: q, level: 1 },
-    { side: 'Sell', price: ask2, quantity: q, level: 2 },
-  ];
+  const out: DesiredOrder[] = [];
+  for (const n of [1, 2, 3] as const) {
+    const bidTotalBps = bidBps + (n - 1) * cfg.levelGapBps;
+    out.push({
+      side: 'Buy',
+      price: mid * (1 - bpsToFrac(bidTotalBps)),
+      quantity: q,
+      level: n,
+    });
+  }
+  for (const n of [1, 2, 3] as const) {
+    const askTotalBps = askBps + (n - 1) * cfg.levelGapBps;
+    out.push({
+      side: 'Sell',
+      price: mid * (1 + bpsToFrac(askTotalBps)),
+      quantity: q,
+      level: n,
+    });
+  }
+  return out;
 }
 
 export { clamp };

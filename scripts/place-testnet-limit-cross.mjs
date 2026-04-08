@@ -105,7 +105,22 @@ async function main() {
       body: payload,
     })
   );
-  if (!res.ok) process.exit(1);
+  if (!res.ok) {
+    const msg =
+      payload &&
+      typeof payload === 'object' &&
+      payload.error &&
+      typeof payload.error === 'object' &&
+      typeof payload.error.message === 'string'
+        ? payload.error.message
+        : '';
+    if (res.status === 403 && /onboarding/i.test(msg)) {
+      console.error(
+        'Temple rejected trading: finish onboarding in the testnet app for this API key’s account, or try allowed region/VPN off; message is often used for geo/compliance too.'
+      );
+    }
+    process.exit(1);
+  }
 }
 
 main().catch((e) => {
